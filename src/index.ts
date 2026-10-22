@@ -10,6 +10,8 @@ import { reviewRouter } from './routes/reviewRouter.ts';
 import { likeRouter } from './routes/likeRouter.ts';
 import { flagRouter } from './routes/flagRouter.ts';
 import { auditRouter } from './routes/auditRouter.ts';
+import { errorHandler } from './middlewares/errorHandler.ts';
+import { authRouter } from './routes/authRouter.ts';
 
 const app: Application = express();
 const PORT: number = 3000;
@@ -34,12 +36,15 @@ app.get('/health', async (req: Request, res: Response) => {
 });
 
 app.use('/api/v1/stalls', stallRouter);
+app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/menu-items', menuItemRouter);
 app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/likes', likeRouter);
 app.use('/api/v1/flags', flagRouter);
 app.use('/api/v1/audit', auditRouter);
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server berjalan di http://localhost:${PORT}`);

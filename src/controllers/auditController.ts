@@ -1,8 +1,10 @@
 import type { Request, Response } from 'express';
 import type { CreateAuditInput } from '../repositories/auditRepository.ts';
 import { AuditService } from '../services/auditService.ts';
+import { getAuthenticatedUser } from '../middlewares/authenticate.ts';
+import type { AuthUser } from '../services/tokenService.ts';
 
-type AuditRequestInput = Omit<CreateAuditInput, 'metadata'> & {
+type AuditRequestInput = Omit<CreateAuditInput, 'metadata' | 'userId'> & {
   metadata?: string | Record<string, unknown> | null;
 };
 
@@ -19,9 +21,8 @@ const isCreateAuditInput = (body: unknown): body is AuditRequestInput => {
     (typeof input.metadata === 'object' && !Array.isArray(input.metadata));
   return (
     Object.keys(input).every((key) =>
-      ['userId', 'action', 'targetTable', 'targetId', 'metadata'].includes(key),
+      ['action', 'targetTable', 'targetId', 'metadata'].includes(key),
     ) &&
-    isPositiveInteger(input.userId) &&
     typeof input.action === 'string' &&
     input.action.trim().length > 0 &&
     input.action.trim().length <= 50 &&
@@ -64,12 +65,13 @@ export class AuditController {
     if (!isCreateAuditInput(req.body)) {
       return res.status(400).json({
         status: 'fail',
-        message: 'Body harus berisi userId, action, targetTable, targetId, dan metadata opsional yang valid',
+        message: 'Body harus berisi action, targetTable, targetId, dan metadata opsional yang valid; userId diambil dari token',
       });
     }
     try {
+      const user = getAuthenticatedUser<AuthUser>(res);
       const input = {
-        userId: req.body.userId,
+        userId: user.id,
         action: req.body.action.trim(),
         targetTable: req.body.targetTable.trim(),
         targetId: req.body.targetId,

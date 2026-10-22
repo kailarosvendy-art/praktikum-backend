@@ -2,6 +2,24 @@ import { getDb } from '../db/index.ts';
 import { eq } from 'drizzle-orm';
 import { users } from '../db/schema.ts';
 
+export type UserRole = 'admin' | 'owner' | 'customer';
+
+export interface UserAuthRecord {
+  id: number;
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: UserRole;
+}
+
+export interface UserProfileRecord {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  createdAt: Date | null;
+}
+
 export interface CreateUserInput {
   name: string;
   email: string;
@@ -9,6 +27,21 @@ export interface CreateUserInput {
 }
 
 export class UserRepository {
+  async findByEmail(email: string): Promise<UserAuthRecord | undefined> {
+    const db = await getDb();
+    const rows = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        passwordHash: users.passwordHash,
+        role: users.role,
+      })
+      .from(users)
+      .where(eq(users.email, email));
+    return rows[0];
+  }
+
   async findById(id: number) {
     const db = await getDb();
     const rows = await db
@@ -32,7 +65,7 @@ export class UserRepository {
       .orderBy(users.id);
   }
 
-  async create(input: CreateUserInput) {
+  async create(input: CreateUserInput): Promise<UserProfileRecord | undefined> {
     const db = await getDb();
     const rows = await db
       .insert(users)
@@ -43,6 +76,14 @@ export class UserRepository {
         passwordHash: input.passwordHash,
         role: 'customer',
       });
-    return rows[0];
+    const row = rows[0];
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: row.role,
+      createdAt: row.createdAt,
+    };
   }
 }
