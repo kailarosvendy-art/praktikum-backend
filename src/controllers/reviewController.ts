@@ -1,31 +1,15 @@
-import type { Request, Response } from 'express';
-import type { CreateReviewInput } from '../repositories/reviewRepository.ts';
+import type { NextFunction, Request, Response } from 'express';
 import { ReviewService } from '../services/reviewService.ts';
+import { getValidated } from '../middlewares/validate.ts';
+import { getAuthenticatedUser } from '../middlewares/authenticate.ts';
+import type { CreateStallReviewBody } from '../schemas/reviewSchema.ts';
+import type { IdParam } from '../schemas/stallSchema.ts';
+import type { AuthUser } from '../services/tokenService.ts';
+import { AppError } from '../errors/AppError.ts';
 
-const isPositiveInteger = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value > 0;
-
-const isCreateReviewInput = (body: unknown): body is CreateReviewInput => {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
-  const input = body as Record<string, unknown>;
-  return (
-    Object.keys(input).every((key) => ['stallId', 'userId', 'rating', 'comment'].includes(key)) &&
-    isPositiveInteger(input.stallId) &&
-    isPositiveInteger(input.userId) &&
-    typeof input.rating === 'number' &&
-    Number.isInteger(input.rating) &&
-    input.rating >= 1 &&
-    input.rating <= 5 &&
-    (input.comment === undefined || input.comment === null || typeof input.comment === 'string')
-  );
-};
-
+type ReviewOperations = Pick<ReviewService, 'getAllReviews' | 'createReview' | 'deleteReview'>;
 export class ReviewController {
-  private reviewService: ReviewService;
-
-  constructor(reviewService: ReviewService = new ReviewService()) {
-    this.reviewService = reviewService;
-  }
+  constructor(private readonly reviewService: ReviewOperations = new ReviewService()) {}
 
   private handleError(res: Response, error: unknown): Response {
     if (error instanceof Error && error.message === 'REVIEW_NOT_FOUND') {
@@ -64,30 +48,37 @@ export class ReviewController {
     }
   };
 
-  createReview = async (req: Request, res: Response): Promise<Response> => {
-    if (!isCreateReviewInput(req.body)) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Body harus berisi stallId dan userId positif, rating 1 sampai 5, serta comment opsional',
-      });
-    }
+  createStallReview = async (
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
+      const { id } = getValidated<IdParam>(res, 'params');
+      const input = getValidated<CreateStallReviewBody>(res, 'body');
+      const user = getAuthenticatedUser<AuthUser>(res);
       const review = await this.reviewService.createReview({
-        ...req.body,
-        ...(typeof req.body.comment === 'string' ? { comment: req.body.comment.trim() } : {}),
+        stallId: id,
+        userId: user.id,
+        ...input,
       });
-      return res.status(201).json({ status: 'success', data: review });
+      res.status(201).json({ status: 'success', data: review });
     } catch (error) {
-      return this.handleError(res, error);
+      if (error instanceof Error && error.message === 'STALL_NOT_FOUND') {
+        next(new AppError(404, 'Data warung tidak ditemukan'));
+        return;
+      }
+      if (error instanceof Error && error.message === 'USER_NOT_FOUND') {
+        next(new AppError(401, 'Pengguna pada token tidak lagi tersedia'));
+        return;
+      }
+      next(error);
     }
   };
 
   deleteReview = async (req: Request, res: Response): Promise<Response> => {
-    const id = Number(req.params.id);
-    if (!isPositiveInteger(id)) {
-      return res.status(400).json({ status: 'fail', message: 'id harus berupa bilangan bulat positif' });
-    }
     try {
+      const { id } = getValidated<IdParam>(res, 'params');
       const review = await this.reviewService.deleteReview(id);
       return res.status(200).json({ status: 'success', data: review });
     } catch (error) {

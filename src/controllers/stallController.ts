@@ -1,30 +1,35 @@
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { StallService } from '../services/stallService.ts';
+import { getValidated } from '../middlewares/validate.ts';
+import { getAuthenticatedUser } from '../middlewares/authenticate.ts';
+import type { AuthUser } from '../services/tokenService.ts';
+import { AppError } from '../errors/AppError.ts';
+import type {
+  CreateStallInput,
+  IdParam,
+  StallQuery,
+  UpdateStallInput,
+} from '../schemas/stallSchema.ts';
+
+type StallOperations = Pick<
+  StallService,
+  'getAllStalls' | 'getStallById' | 'getStallMenus' | 'createStall' | 'updateStall' | 'deleteStall'
+>;
 
 export class StallController {
-  private stallService: StallService;
+  constructor(private readonly stallService: StallOperations = new StallService()) {}
 
-  constructor(stallService: StallService = new StallService()) {
-    this.stallService = stallService;
-  }
-
-  private handleError(res: Response, error: unknown): Response {
+  private handleError(next: NextFunction, error: unknown): void {
     if (error instanceof Error && error.message === 'STALL_NOT_FOUND') {
-      return res.status(404).json({ status: 'fail', message: 'Data warung tidak ditemukan' });
+      next(new AppError(404, 'Data warung tidak ditemukan'));
+      return;
     }
-    return res.status(500).json({
-      status: 'error',
-      message: 'Terjadi kesalahan pada server',
-      error: error instanceof Error ? error.message : String(error),
-    });
+    next(error);
   }
 
-  getStalls = async (req: Request, res: Response): Promise<Response> => {
+  getStalls = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const page = Number(req.query.page) || 1;
-      const limit = Number(req.query.limit) || 10;
-      const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-      const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+      const { page, limit, search, category } = getValidated<StallQuery>(res, 'query');
 
       const { data, total } = await this.stallService.getAllStalls({
         search,
@@ -33,54 +38,62 @@ export class StallController {
         limit,
       });
 
-      return res.status(200).json({ status: 'success', meta: { page, limit, total }, data });
+      res.status(200).json({ status: 'success', meta: { page, limit, total }, data });
     } catch (error) {
-      return this.handleError(res, error);
+      this.handleError(next, error);
     }
   };
 
-  getStallById = async (req: Request, res: Response): Promise<Response> => {
+  getStallById = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const stall = await this.stallService.getStallById(Number(req.params.id));
-      return res.status(200).json({ status: 'success', data: stall });
+      const { id } = getValidated<IdParam>(res, 'params');
+      const stall = await this.stallService.getStallById(id);
+      res.status(200).json({ status: 'success', data: stall });
     } catch (error) {
-      return this.handleError(res, error);
+      this.handleError(next, error);
     }
   };
 
-  getStallMenus = async (req: Request, res: Response): Promise<Response> => {
+  getStallMenus = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const menus = await this.stallService.getStallMenus(Number(req.params.id));
-      return res.status(200).json({ status: 'success', data: menus });
+      const { id } = getValidated<IdParam>(res, 'params');
+      const menus = await this.stallService.getStallMenus(id);
+      res.status(200).json({ status: 'success', data: menus });
     } catch (error) {
-      return this.handleError(res, error);
+      this.handleError(next, error);
     }
   };
 
-  createStall = async (req: Request, res: Response): Promise<Response> => {
+  createStall = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const stall = await this.stallService.createStall(req.body);
-      return res.status(201).json({ status: 'success', data: stall });
+      const input = getValidated<CreateStallInput>(res, 'body');
+      const user = getAuthenticatedUser<AuthUser>(res);
+      const stall = await this.stallService.createStall({ ...input, ownerId: user.id });
+      res.status(201).json({ status: 'success', data: stall });
     } catch (error) {
-      return this.handleError(res, error);
+      this.handleError(next, error);
     }
   };
 
-  updateStall = async (req: Request, res: Response): Promise<Response> => {
+  updateStall = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const stall = await this.stallService.updateStall(Number(req.params.id), req.body);
-      return res.status(200).json({ status: 'success', data: stall });
+      const { id } = getValidated<IdParam>(res, 'params');
+      const input = getValidated<UpdateStallInput>(res, 'body');
+      const user = getAuthenticatedUser<AuthUser>(res);
+      const stall = await this.stallService.updateStall(id, input, user);
+      res.status(200).json({ status: 'success', data: stall });
     } catch (error) {
-      return this.handleError(res, error);
+      this.handleError(next, error);
     }
   };
 
-  deleteStall = async (req: Request, res: Response): Promise<Response> => {
+  deleteStall = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const stall = await this.stallService.deleteStall(Number(req.params.id));
-      return res.status(200).json({ status: 'success', data: stall });
+      const { id } = getValidated<IdParam>(res, 'params');
+      const stall = await this.stallService.deleteStall(id);
+      res.status(200).json({ status: 'success', data: stall });
     } catch (error) {
-      return this.handleError(res, error);
+      this.handleError(next, error);
     }
   };
 }

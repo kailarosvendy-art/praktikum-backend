@@ -3,70 +3,100 @@ import swaggerAutogen from 'swagger-autogen';
 const doc = {
   info: { title: 'Review Kantin API', version: '1.0.0' },
   servers: [{ url: 'http://localhost:3000' }],
+  securityDefinitions: {
+    bearerAuth: {
+      type: 'apiKey',
+      name: 'Authorization',
+      in: 'header',
+      description: 'Masukkan token dengan format: Bearer <token>',
+    },
+  },
   definitions: {
     AuditInput: {
-      userId: 2,
-      action: 'UPDATE',
-      targetTable: 'REVIEWS',
-      targetId: 7,
+      $action: 'UPDATE',
+      $targetTable: 'REVIEWS',
+      $targetId: 7,
       metadata: { field: 'status', value: 'resolved' },
     },
     FlagStatusUpdate: {
-      status: 'resolved',
+      $status: 'resolved',
     },
     LikeInput: {
-      reviewId: 1,
-      userId: 2,
-    },
-    ReviewInput: {
-      stallId: 1,
-      userId: 2,
-      rating: 5,
-      comment: 'Makanannya enak',
+      $reviewId: 1,
     },
     MenuItemInput: {
-      type: 'object',
-      required: ['stallId', 'name', 'price'],
-      properties: {
-        stallId: { type: 'integer', example: 1 },
-        name: { type: 'string', example: 'Nasi Goreng Spesial' },
-        price: { type: 'integer', minimum: 0, example: 18000 },
-        isAvailable: { type: 'boolean', example: true },
-      },
+      $stallId: 1,
+      $name: 'Nasi Goreng Spesial',
+      $price: 18000,
+      isAvailable: true,
     },
     MenuItemUpdate: {
-      type: 'object',
-      properties: {
-        stallId: { type: 'integer', example: 1 },
-        name: { type: 'string', example: 'Nasi Goreng Spesial' },
-        price: { type: 'integer', minimum: 0, example: 18000 },
-        isAvailable: { type: 'boolean', example: true },
-      },
+      stallId: 1,
+      name: 'Nasi Goreng Spesial',
+      price: 18000,
+      isAvailable: true,
     },
     UserInput: {
-      type: 'object',
-      required: ['name', 'email', 'password'],
-      properties: {
-        name: { type: 'string', example: 'Budi Santoso' },
-        email: { type: 'string', format: 'email', example: 'budi@example.com' },
-        password: { type: 'string', example: 'password123' },
+      $name: 'Budi Santoso',
+      $email: 'budi@example.com',
+      $password: 'password123',
+    },
+    RegisterInput: {
+      $name: 'Budi Santoso',
+      $email: 'budi@example.com',
+      $password: 'password123',
+    },
+    LoginInput: {
+      $email: 'budi@example.com',
+      $password: 'password123',
+    },
+    AuthUser: {
+      $id: 1,
+      $name: 'Budi Santoso',
+      $email: 'budi@example.com',
+      $role: 'customer',
+    },
+    RegisterResponse: {
+      $status: 'success',
+      $data: {
+        user: { id: 1, name: 'Budi Santoso', email: 'budi@example.com', role: 'customer' },
       },
     },
+    LoginResponse: {
+      $token: 'jwt-token-example',
+      $tokenType: 'Bearer',
+      $expiresIn: '2h',
+      $user: { id: 1, name: 'Budi Santoso', email: 'budi@example.com', role: 'customer' },
+    },
+    AuthMeResponse: {
+      $status: 'success',
+      $data: { id: 1, name: 'Budi Santoso', email: 'budi@example.com', role: 'customer' },
+    },
     StallInput: {
-      type: 'object',
-      required: ['ownerId', 'name'],
-      properties: {
-        ownerId: { type: 'integer', example: 2 },
-        name: { type: 'string', example: 'Warung Baru' },
-        category: { type: 'string', example: 'Nasi' },
-        location: { type: 'string', example: 'Kantin FK' },
-        description: { type: 'string' },
-      },
+      $name: 'Warung Baru',
+      category: 'Nasi',
+      location: 'Kantin FK',
+      description: 'Deskripsi warung',
+    },
+    StallReviewInput: {
+      $rating: 5,
+      comment: 'Makanannya enak',
+    },
+    StallUpdate: {
+      name: 'Warung Baru',
+      category: 'Nasi',
+      location: 'Kantin FK',
+      description: 'Deskripsi warung',
+    },
+    ValidationError: {
+      $status: 'fail',
+      $message: 'Validasi gagal',
+      $errors: [{ $field: 'page', $message: 'page minimal 1' }],
     },
   },
 };
 
-const outputFile = './swagger-output.json';
+const outputFile = './src/docs/swagger-output.json';
 const endpointsFiles = ['./src/index.ts'];
 
 swaggerAutogen()(outputFile, endpointsFiles, doc);

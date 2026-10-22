@@ -1,6 +1,8 @@
 import type { Request, Response } from 'express';
 import type { CreateLikeInput } from '../repositories/likeRepository.ts';
 import { LikeService } from '../services/likeService.ts';
+import { getAuthenticatedUser } from '../middlewares/authenticate.ts';
+import type { AuthUser } from '../services/tokenService.ts';
 
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value > 0;
@@ -9,9 +11,9 @@ const isCreateLikeInput = (body: unknown): body is CreateLikeInput => {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
   const input = body as Record<string, unknown>;
   return (
-    Object.keys(input).every((key) => ['reviewId', 'userId'].includes(key)) &&
+    Object.keys(input).every((key) => key === 'reviewId') &&
     isPositiveInteger(input.reviewId) &&
-    isPositiveInteger(input.userId)
+    !('userId' in input)
   );
 };
 
@@ -51,11 +53,15 @@ export class LikeController {
     if (!isCreateLikeInput(req.body)) {
       return res.status(400).json({
         status: 'fail',
-        message: 'Body harus berisi reviewId dan userId berupa bilangan bulat positif',
+        message: 'Body harus berisi reviewId berupa bilangan bulat positif; userId diambil dari token',
       });
     }
     try {
-      const like = await this.likeService.createLike(req.body);
+      const user = getAuthenticatedUser<AuthUser>(res);
+      const like = await this.likeService.createLike({
+        reviewId: req.body.reviewId,
+        userId: user.id,
+      });
       return res.status(201).json({ status: 'success', data: like });
     } catch (error) {
       return this.handleError(res, error);
